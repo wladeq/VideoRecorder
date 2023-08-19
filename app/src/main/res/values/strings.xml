@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">VideoRecorder</string>
+    <string name="title_home">Home</string>
+    <string name="title_dashboard">Record</string>
+    <string name="title_notifications">Notifications</string>
+    <string name="record">Record</string>
+    <string name="get_video">Get video</string>
+</resources>

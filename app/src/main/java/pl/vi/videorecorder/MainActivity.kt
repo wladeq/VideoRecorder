@@ -9,17 +9,20 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
+import android.view.View
+import android.widget.MediaController
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.Scopes
 import com.google.android.gms.common.api.Scope
-import com.google.api.client.extensions.android.http.AndroidHttp
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.google.api.client.http.FileContent
+import com.google.api.client.http.HttpResponseException
 import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.client.util.IOUtils
 import com.google.api.services.drive.Drive
@@ -31,11 +34,14 @@ import pl.vi.videorecorder.databinding.ActivityMainBinding
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.IOException
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     lateinit var mDrive: Drive
+    private var selectedFile: File? = null
+    private var selectedUri: Uri? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,7 +72,15 @@ class MainActivity : AppCompatActivity() {
         }
 
 
-//        binding.getVideoBtn.setOnClickListener {
+        binding.getVideoBtn.setOnClickListener {
+
+            val intent = Intent()
+            intent.setType("video/*")
+            intent.setAction(Intent.ACTION_GET_CONTENT)
+            startActivityForResult(
+                Intent.createChooser(intent, "Select Video"),
+                VIDEO_PICK_RESULT
+            )
 //            val intent = Intent()
 //            intent.setType("video/*")
 //            intent.setAction(Intent.ACTION_GET_CONTENT)
@@ -91,10 +105,14 @@ class MainActivity : AppCompatActivity() {
 ////
 ////                print("THE PATH IS ${path}")
 //            }
-        //    }
+            }
 
-        binding.share.setOnClickListener {
+        binding.uploadToDrive.setOnClickListener {
             signIn()
+        }
+
+        binding.shareBtn.setOnClickListener {
+            shareVideo(selectedUri)
         }
 
     }
@@ -124,11 +142,10 @@ class MainActivity : AppCompatActivity() {
 
             VIDEO_PICK_RESULT -> {
                 if (resultCode == RESULT_OK) {
-                    val selectedFile = data?.data ?: Uri.EMPTY
-                    val fileCopy = makeCopy(selectedFile)
-
-                    uploadFileToGDrive(this, fileCopy)
-
+                    val file = data?.data ?: Uri.EMPTY
+                    selectedUri = file
+                    selectedFile = makeCopy(file)
+                    displayVideo(file)
 //                    val videoFile = fileCopy
 //                    val fileMetadata = File()
 //                    fileMetadata.name = "video.mp4"
@@ -166,16 +183,12 @@ class MainActivity : AppCompatActivity() {
                 if (resultCode == RESULT_OK) {
                     mDrive = getDriveService(this)
 
-                    val intent = Intent()
-                    intent.setType("video/*")
-                    intent.setAction(Intent.ACTION_GET_CONTENT)
-                    startActivityForResult(
-                        Intent.createChooser(intent, "Select Video"),
-                        VIDEO_PICK_RESULT
-                    )
+                    uploadFileToGDrive(this, selectedFile)
+
+
+
+
                 }
-
-
             }
 
             else -> {
@@ -184,24 +197,46 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun uploadFileToGDrive(context: Context, selectedFile: File) {
+    fun uploadFileToGDrive(context: Context, selectedFile: File?) {
         mDrive.let { googleDriveService ->
             lifecycleScope.launch {
                 try {
 //                    val fileName = "Ticket"
                     val raunit = selectedFile
                     val gfile = com.google.api.services.drive.model.File()
-                    gfile.name = "First Video"
+                    gfile.name = "First Video1"
                     val mimetype = "video/*"
                     val fileContent = FileContent(mimetype, raunit)
                     var fileid = ""
+                    var file: com.google.api.services.drive.model.File? = null
 
                     withContext(Dispatchers.Main) {
 
                         withContext(Dispatchers.IO) {
+
+
                             launch {
-                                var mFile =
-                                    googleDriveService.Files().create(gfile, fileContent).execute()
+                                var request =
+                                    googleDriveService.files().create(gfile, fileContent)
+                                        .setFields("id")
+
+                                try {
+                                    file = request.execute()
+
+                                    updateLink(file)
+                                } catch (e: HttpResponseException) {
+                                    if (e.statusCode == 308) {
+
+                                        // Resumable upload has started
+                                        updateLink(file)
+                                    } else {
+                                        e.printStackTrace()
+
+                                    }
+                                } catch (e: IOException) {
+                                    e.printStackTrace()
+
+                                }
                             }
                         }
                     }
@@ -223,6 +258,24 @@ class MainActivity : AppCompatActivity() {
         }
 
     }
+    private fun displayVideo(uri: Uri) {
+        binding.videoView.visibility = View.VISIBLE
+        val videoContainer = binding.videoView
+        val mediaController = MediaController(this)
+        mediaController.setAnchorView(videoContainer)
+        videoContainer.setMediaController(mediaController)
+        videoContainer.setVideoURI(uri)
+        videoContainer.requestFocus()
+        videoContainer.start()
+    }
+    fun updateLink(link: com.google.api.services.drive.model.File?) {
+        print(link?.webContentLink)
+//        lifecycleScope.launch {
+//            withContext(Dispatchers.Main) {
+//                binding.path.setText(link)
+//            }
+//        }
+    }
 
     fun getRealPathFromURI(context: Context, contentUri: Uri): String? {
         var cursor: Cursor? = null
@@ -236,6 +289,14 @@ class MainActivity : AppCompatActivity() {
             cursor?.close()
         }
     }
+
+    private fun shareVideo(uri: Uri?) {
+        val shareIntent = Intent(Intent.ACTION_SEND)
+        shareIntent.type = "video/*"
+        shareIntent.putExtra(Intent.EXTRA_STREAM, uri)
+        startActivity(Intent.createChooser(shareIntent, "Share Video"))
+    }
+
 
     private fun makeCopy(fileUri: Uri): File {
         val parcelFileDescriptor =
@@ -272,7 +333,7 @@ class MainActivity : AppCompatActivity() {
             )
             credential.selectedAccount = googleAccount!!.account!!
             return Drive.Builder(
-                AndroidHttp.newCompatibleTransport(),
+                com.google.api.client.http.javanet.NetHttpTransport(),
                 JacksonFactory.getDefaultInstance(),
                 credential
             )

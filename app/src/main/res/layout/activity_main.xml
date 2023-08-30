@@ -3,50 +3,91 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/container"
+    android:background="@color/grey"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <Button
-        android:visibility="gone"
-        android:id="@+id/get_video_btn"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/videoContainer"
         android:layout_width="match_parent"
-        android:layout_height="70dp"
-        android:layout_marginBottom="16dp"
-        android:text="@string/get_video"
-        app:layout_constraintBottom_toTopOf="@+id/share"
+        android:layout_height="400dp"
+        app:layout_constraintBottom_toTopOf="@+id/record_btn"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <VideoView
+            android:id="@+id/videoView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:visibility="invisible"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
 
     <Button
         android:id="@+id/record_btn"
         android:layout_width="0dp"
         android:layout_height="70dp"
-        android:layout_marginBottom="16dp"
+        android:backgroundTint="@color/orange"
         android:text="@string/record"
+        android:textColor="@color/white"
         app:layout_constraintBottom_toTopOf="@+id/get_video_btn"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
     <Button
-        android:id="@+id/share"
+        android:id="@+id/get_video_btn"
         android:layout_width="match_parent"
         android:layout_height="70dp"
-        android:layout_marginBottom="16dp"
-        android:text="Share"
+        android:backgroundTint="@color/orange"
+        android:text="Select video"
+        android:textColor="@color/white"
+        app:layout_constraintBottom_toTopOf="@+id/share_btn"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <Button
+        android:id="@+id/share_btn"
+        android:layout_width="0dp"
+        android:layout_height="70dp"
+        android:backgroundTint="@color/orange"
+        android:text="Share locally"
+        android:textColor="@color/white"
+        app:layout_constraintBottom_toTopOf="@+id/upload_to_drive"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <Button
+        android:id="@+id/upload_to_drive"
+        android:layout_width="match_parent"
+        android:layout_height="70dp"
+        android:layout_marginBottom="5dp"
+        android:text="Upload to goggle drive"
+        android:backgroundTint="@color/orange"
+        android:textColor="@color/white"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <TextView
+    <EditText
         android:id="@+id/path"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="48dp"
         android:textSize="24dp"
         android:textStyle="bold"
+        android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.498"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
+
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>

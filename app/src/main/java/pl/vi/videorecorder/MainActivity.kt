@@ -13,7 +13,6 @@ import android.view.View
 import android.widget.MediaController
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -21,6 +20,9 @@ import com.google.android.gms.common.Scopes
 import com.google.android.gms.common.api.Scope
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
+import com.google.api.client.googleapis.media.MediaHttpUploader
+import com.google.api.client.googleapis.media.MediaHttpUploader.UploadState
+import com.google.api.client.googleapis.media.MediaHttpUploaderProgressListener
 import com.google.api.client.http.FileContent
 import com.google.api.client.http.HttpResponseException
 import com.google.api.client.json.jackson2.JacksonFactory
@@ -35,6 +37,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -182,11 +185,7 @@ class MainActivity : AppCompatActivity() {
             RC_SIGN_IN -> {
                 if (resultCode == RESULT_OK) {
                     mDrive = getDriveService(this)
-
                     uploadFileToGDrive(this, selectedFile)
-
-
-
 
                 }
             }
@@ -219,7 +218,8 @@ class MainActivity : AppCompatActivity() {
                                 var request =
                                     googleDriveService.files().create(gfile, fileContent)
                                         .setFields("id")
-
+                                request.mediaHttpUploader.progressListener =
+                                    FileUploadProgressListener()
                                 try {
                                     file = request.execute()
 
@@ -379,4 +379,25 @@ class MainActivity : AppCompatActivity() {
         const val RC_SIGN_IN = 1004
 
     }
+
+    class FileUploadProgressListener : MediaHttpUploaderProgressListener {
+        @Throws(IOException::class)
+        override fun progressChanged(uploader: MediaHttpUploader) {
+            when (uploader.uploadState) {
+                UploadState.INITIATION_STARTED -> {
+
+                    print("ZONK INITIATION_STARTED")
+                }
+                UploadState.INITIATION_COMPLETE -> print("ZONK INITIATION_COMPLETE")
+                UploadState.MEDIA_IN_PROGRESS ->           // postToDialog("Upload in progress");
+                    print("ZONK Upload percentage: " + uploader.progress)
+
+                UploadState.MEDIA_COMPLETE -> print("ZONK MEDIA_COMPLETE")
+                UploadState.NOT_STARTED -> print("ZONK NOT_STARTED")
+            }
+        }
+
+
+    }
+
 }

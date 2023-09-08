@@ -204,7 +204,7 @@ class MainActivity : AppCompatActivity() {
                     val raunit = selectedFile
                     val gfile = com.google.api.services.drive.model.File()
                     gfile.name = "First Video1"
-                    val mimetype = "video/*"
+                    val mimetype = "video/mp4"
                     val fileContent = FileContent(mimetype, raunit)
                     var fileid = ""
                     var file: com.google.api.services.drive.model.File? = null
@@ -218,17 +218,66 @@ class MainActivity : AppCompatActivity() {
                                 var request =
                                     googleDriveService.files().create(gfile, fileContent)
                                         .setFields("id")
-                                request.mediaHttpUploader.progressListener =
-                                    FileUploadProgressListener()
+//                                request.mediaHttpUploader.progressListener =
+//                                    FileUploadProgressListener()
+
+                                request.mediaHttpUploader.progressListener = (
+                                    object: FileUploadProgressListener(){
+                                        override fun progressChanged(uploader: MediaHttpUploader) {
+                                            when (uploader.uploadState) {
+                                                UploadState.INITIATION_STARTED -> {
+                                                    lifecycleScope.launch {
+                                                        withContext(Dispatchers.Main) {
+                                                            Toast.makeText(
+                                                                context,
+                                                                "Upload started",
+                                                                Toast.LENGTH_LONG
+                                                            ).show()
+                                                        }
+                                                    }
+
+                                                }
+                                                UploadState.INITIATION_COMPLETE -> print("ZONK INITIATION_COMPLETE")
+                                                UploadState.MEDIA_IN_PROGRESS ->{
+                                                    lifecycleScope.launch {
+                                                        withContext(Dispatchers.Main) {
+                                                            Toast.makeText(
+                                                                context,
+                                                                " Upload percentage: + ${uploader.progress}",
+                                                                Toast.LENGTH_LONG
+                                                            ).show()
+                                                        }
+                                                    }
+                                                }
+
+
+                                                UploadState.MEDIA_COMPLETE -> {
+                                                    lifecycleScope.launch {
+                                                        withContext(Dispatchers.Main) {
+                                                            Toast.makeText(
+                                                                context,
+                                                                " Upload completed",
+                                                                Toast.LENGTH_LONG
+                                                            ).show()
+                                                            updateLink(file)
+                                                        }
+
+                                                    }
+
+
+                                                }
+                                                UploadState.NOT_STARTED -> print("ZONK NOT_STARTED")
+                                            }
+                                        }
+                                    }
+                                )
                                 try {
                                     file = request.execute()
-
-                                    updateLink(file)
                                 } catch (e: HttpResponseException) {
                                     if (e.statusCode == 308) {
 
                                         // Resumable upload has started
-                                        updateLink(file)
+
                                     } else {
                                         e.printStackTrace()
 
@@ -269,12 +318,10 @@ class MainActivity : AppCompatActivity() {
         videoContainer.start()
     }
     fun updateLink(link: com.google.api.services.drive.model.File?) {
-        print(link?.webContentLink)
-//        lifecycleScope.launch {
-//            withContext(Dispatchers.Main) {
-//                binding.path.setText(link)
-//            }
-//        }
+        //print(link?.webContentLink)
+
+                binding.path.visibility = View.VISIBLE
+                binding.path.setText(link?.webContentLink)
     }
 
     fun getRealPathFromURI(context: Context, contentUri: Uri): String? {
@@ -380,7 +427,7 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    class FileUploadProgressListener : MediaHttpUploaderProgressListener {
+    open class FileUploadProgressListener : MediaHttpUploaderProgressListener {
         @Throws(IOException::class)
         override fun progressChanged(uploader: MediaHttpUploader) {
             when (uploader.uploadState) {
@@ -396,8 +443,6 @@ class MainActivity : AppCompatActivity() {
                 UploadState.NOT_STARTED -> print("ZONK NOT_STARTED")
             }
         }
-
-
     }
 
 }

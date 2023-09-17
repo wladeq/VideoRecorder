@@ -4,19 +4,24 @@ import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.database.Cursor
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
 import android.view.View
+import android.widget.ImageView
 import android.widget.MediaController
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.withCreated
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.Scopes
+import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.Scope
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
@@ -29,7 +34,12 @@ import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.client.util.IOUtils
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.MultiFormatWriter
+import com.google.zxing.WriterException
+import com.google.zxing.common.BitMatrix
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import pl.vi.videorecorder.databinding.ActivityMainBinding
@@ -108,15 +118,16 @@ class MainActivity : AppCompatActivity() {
 ////
 ////                print("THE PATH IS ${path}")
 //            }
-            }
-
-        binding.uploadToDrive.setOnClickListener {
-            signIn()
         }
 
         binding.shareBtn.setOnClickListener {
             shareVideo(selectedUri)
         }
+
+        binding.uploadToDrive.setOnClickListener {
+            signIn()
+        }
+
 
     }
 
@@ -187,6 +198,14 @@ class MainActivity : AppCompatActivity() {
                     mDrive = getDriveService(this)
                     uploadFileToGDrive(this, selectedFile)
 
+                } else {
+                    val task = GoogleSignIn.getSignedInAccountFromIntent(data)
+                    try {
+                        val account = task.getResult(ApiException::class.java)
+                        // Signed in successfully
+                    } catch (e: ApiException) {
+                        Log.w("SignInError", "signInResult:failed code=" + e.statusCode)
+                    }
                 }
             }
 
@@ -195,6 +214,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
 
     fun uploadFileToGDrive(context: Context, selectedFile: File?) {
         mDrive.let { googleDriveService ->
@@ -209,21 +229,21 @@ class MainActivity : AppCompatActivity() {
                     var fileid = ""
                     var file: com.google.api.services.drive.model.File? = null
 
-                    withContext(Dispatchers.Main) {
 
-                        withContext(Dispatchers.IO) {
+                    withContext(Dispatchers.IO) {
 
 
-                            launch {
-                                var request =
-                                    googleDriveService.files().create(gfile, fileContent)
-                                        .setFields("id")
+                        launch {
+                            var request =
+                                googleDriveService.files().create(gfile, fileContent)
+                                    .setFields("id")
 //                                request.mediaHttpUploader.progressListener =
 //                                    FileUploadProgressListener()
-
-                                request.mediaHttpUploader.progressListener = (
-                                    object: FileUploadProgressListener(){
-                                        override fun progressChanged(uploader: MediaHttpUploader) {
+                            request.mediaHttpUploader.chunkSize =
+                                MediaHttpUploader.MINIMUM_CHUNK_SIZE
+                            request.mediaHttpUploader.progressListener = (
+                                    MediaHttpUploaderProgressListener { uploader ->
+                                        try {
                                             when (uploader.uploadState) {
                                                 UploadState.INITIATION_STARTED -> {
                                                     lifecycleScope.launch {
@@ -231,21 +251,36 @@ class MainActivity : AppCompatActivity() {
                                                             Toast.makeText(
                                                                 context,
                                                                 "Upload started",
-                                                                Toast.LENGTH_LONG
+                                                                Toast.LENGTH_SHORT
                                                             ).show()
+                                                            Log.d(
+                                                                "UploadProgress",
+                                                                "Upload started"
+                                                            )
                                                         }
                                                     }
 
                                                 }
-                                                UploadState.INITIATION_COMPLETE -> print("ZONK INITIATION_COMPLETE")
-                                                UploadState.MEDIA_IN_PROGRESS ->{
+
+                                                UploadState.INITIATION_COMPLETE -> Log.d(
+                                                    "UploadProgress",
+                                                    "Initiation complete"
+                                                )
+
+                                                UploadState.MEDIA_IN_PROGRESS -> {
                                                     lifecycleScope.launch {
                                                         withContext(Dispatchers.Main) {
+                                                            val progressPercentage =
+                                                                (uploader.progress * 100).toInt()
                                                             Toast.makeText(
                                                                 context,
-                                                                " Upload percentage: + ${uploader.progress}",
-                                                                Toast.LENGTH_LONG
+                                                                "Upload percentage: $progressPercentage%",
+                                                                Toast.LENGTH_SHORT
                                                             ).show()
+                                                            Log.d(
+                                                                "UploadProgress",
+                                                                "Upload percentage: $progressPercentage%"
+                                                            )
                                                         }
                                                     }
                                                 }
@@ -256,36 +291,66 @@ class MainActivity : AppCompatActivity() {
                                                         withContext(Dispatchers.Main) {
                                                             Toast.makeText(
                                                                 context,
-                                                                " Upload completed",
-                                                                Toast.LENGTH_LONG
+                                                                "Upload completed",
+                                                                Toast.LENGTH_SHORT
                                                             ).show()
-                                                            updateLink(file)
+                                                            Log.d(
+                                                                "UploadProgress",
+                                                                "Upload completed"
+                                                            )
+
+
+                                                            withContext(Dispatchers.IO){
+                                                                delay(5000)
+                                                                if (!file?.id.isNullOrBlank()) {
+                                                                    updateLink(file)
+                                                                    Log.w(
+                                                                        "UploadProgress",
+                                                                        "id is ${file?.id}"
+                                                                    )
+                                                                    //fetchWebContentLink(file?.id ?: "")
+                                                                } else {
+                                                                    Log.w(
+                                                                        "UploadProgress",
+                                                                        "file?.id is null"
+                                                                    )
+                                                                }
+                                                            }
                                                         }
-
                                                     }
-
-
                                                 }
-                                                UploadState.NOT_STARTED -> print("ZONK NOT_STARTED")
+
+                                                UploadState.NOT_STARTED -> {
+                                                    Log.d("UploadProgress", "Upload not started")
+                                                }
+
+                                                else -> {
+                                                    Log.w(
+                                                        "UploadProgress",
+                                                        "Unknown state: ${uploader.uploadState}"
+                                                    )
+                                                }
+
                                             }
+                                        } catch (ex: Exception) {
+                                            print("pizdec")
                                         }
                                     }
-                                )
-                                try {
-                                    file = request.execute()
-                                } catch (e: HttpResponseException) {
-                                    if (e.statusCode == 308) {
+                                    )
+                            try {
+                                file = request.execute()
+                            } catch (e: HttpResponseException) {
+                                if (e.statusCode == 308) {
 
-                                        // Resumable upload has started
+                                    // Resumable upload has started
 
-                                    } else {
-                                        e.printStackTrace()
-
-                                    }
-                                } catch (e: IOException) {
+                                } else {
                                     e.printStackTrace()
 
                                 }
+                            } catch (e: IOException) {
+                                e.printStackTrace()
+
                             }
                         }
                     }
@@ -307,6 +372,7 @@ class MainActivity : AppCompatActivity() {
         }
 
     }
+
     private fun displayVideo(uri: Uri) {
         binding.videoView.visibility = View.VISIBLE
         val videoContainer = binding.videoView
@@ -317,12 +383,32 @@ class MainActivity : AppCompatActivity() {
         videoContainer.requestFocus()
         videoContainer.start()
     }
-    fun updateLink(link: com.google.api.services.drive.model.File?) {
+
+    suspend fun updateLink(link: com.google.api.services.drive.model.File?) {
         //print(link?.webContentLink)
 
-                binding.path.visibility = View.VISIBLE
-                binding.path.setText(link?.webContentLink)
+        withContext(Dispatchers.Main) {
+            val link = generateDriveLink(link?.id ?: "")
+            Log.d(
+                "UploadProgress",
+                "link - ${link}"
+            )
+            showQRCodeDialog(this@MainActivity, link)
+            binding.path.visibility = View.VISIBLE
+            binding.path.setText(link)
+        }
     }
+    fun updateLink(link: String) {
+        //print(link?.webContentLink)
+
+        binding.path.visibility = View.VISIBLE
+        binding.path.setText(link)
+    }
+
+    fun generateDriveLink(fileId: String): String {
+        return "https://drive.google.com/file/d/$fileId/view?usp=drive_link"
+    }
+
 
     fun getRealPathFromURI(context: Context, contentUri: Uri): String? {
         var cursor: Cursor? = null
@@ -419,6 +505,49 @@ class MainActivity : AppCompatActivity() {
         return videoPath
     }
 
+    @Throws(WriterException::class)
+    fun generateQRCode(text: String): Bitmap? {
+        val width = 500  // width of the QR code
+        val height = 500 // height of the QR code
+        val bitMatrix: BitMatrix
+
+        try {
+            bitMatrix = MultiFormatWriter().encode(
+                text,
+                BarcodeFormat.QR_CODE,
+                width, height, null
+            )
+        } catch (Illegalargumentexception: IllegalArgumentException) {
+            return null
+        }
+
+        val pixels = IntArray(width * height)
+        for (y in 0 until height) {
+            val offset = y * width
+            for (x in 0 until width) {
+                pixels[offset + x] = if (bitMatrix[x, y]) -0x1000000 else -0x1
+            }
+        }
+
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+        return bitmap
+    }
+
+    fun showQRCodeDialog(context: Context, link: String) {
+        val qrCodeBitmap = generateQRCode(link)
+        val imageView = ImageView(context)
+        imageView.setImageBitmap(qrCodeBitmap)
+
+        AlertDialog.Builder(context)
+            .setView(imageView)
+            .setTitle("Scan this QR Code")
+            .setPositiveButton("OK") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+
     companion object {
         const val VIDEO_PERMISSION_REQUEST = 1002
         const val STORAGE_PERMISSION_REQUEST = 1001
@@ -430,18 +559,19 @@ class MainActivity : AppCompatActivity() {
     open class FileUploadProgressListener : MediaHttpUploaderProgressListener {
         @Throws(IOException::class)
         override fun progressChanged(uploader: MediaHttpUploader) {
-            when (uploader.uploadState) {
-                UploadState.INITIATION_STARTED -> {
-
-                    print("ZONK INITIATION_STARTED")
-                }
-                UploadState.INITIATION_COMPLETE -> print("ZONK INITIATION_COMPLETE")
-                UploadState.MEDIA_IN_PROGRESS ->           // postToDialog("Upload in progress");
-                    print("ZONK Upload percentage: " + uploader.progress)
-
-                UploadState.MEDIA_COMPLETE -> print("ZONK MEDIA_COMPLETE")
-                UploadState.NOT_STARTED -> print("ZONK NOT_STARTED")
-            }
+//            when (uploader.uploadState) {
+//                UploadState.INITIATION_STARTED -> {
+//
+//                    print("ZONK INITIATION_STARTED")
+//                }
+//
+//                UploadState.INITIATION_COMPLETE -> print("ZONK INITIATION_COMPLETE")
+//                UploadState.MEDIA_IN_PROGRESS ->           // postToDialog("Upload in progress");
+//                    print("ZONK Upload percentage: " + uploader.progress)
+//
+//                UploadState.MEDIA_COMPLETE -> print("ZONK MEDIA_COMPLETE")
+//                UploadState.NOT_STARTED -> print("ZONK NOT_STARTED")
+//            }
         }
     }
 

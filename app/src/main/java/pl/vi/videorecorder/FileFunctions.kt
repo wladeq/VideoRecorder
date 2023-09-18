@@ -19,7 +19,7 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 
 object FileFunctions {
-    public fun getFileName(contentResolver: ContentResolver, fileUri: Uri): String {
+    fun getFileName(contentResolver: ContentResolver, fileUri: Uri): String {
 
         var name = ""
         val returnCursor = contentResolver.query(fileUri, null, null, null, null)
@@ -32,6 +32,7 @@ object FileFunctions {
 
         return name
     }
+
     @Throws(WriterException::class)
     fun generateQRCode(text: String): Bitmap? {
         val width = 500  // width of the QR code
@@ -74,7 +75,12 @@ object FileFunctions {
 
         return file
     }
-    suspend fun updateLink(link: com.google.api.services.drive.model.File?, context: Context, binding: ActivityMainBinding) {
+
+    suspend fun updateLink(
+        link: com.google.api.services.drive.model.File?,
+        context: Context,
+        binding: ActivityMainBinding
+    ) {
         withContext(Dispatchers.Main) {
             val link = DriveFunctions.generateDriveLink(link?.id ?: "")
             Log.d(

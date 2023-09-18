@@ -1,59 +1,35 @@
 package pl.vi.videorecorder
 
-import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
-import android.provider.OpenableColumns
 import android.util.Log
-import android.view.View
-import android.widget.ImageView
-import android.widget.MediaController
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.Scopes
 import com.google.android.gms.common.api.ApiException
-import com.google.android.gms.common.api.Scope
-import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.google.api.client.googleapis.media.MediaHttpUploader
 import com.google.api.client.googleapis.media.MediaHttpUploader.UploadState
 import com.google.api.client.googleapis.media.MediaHttpUploaderProgressListener
 import com.google.api.client.http.FileContent
 import com.google.api.client.http.HttpResponseException
-import com.google.api.client.json.jackson2.JacksonFactory
-import com.google.api.client.util.IOUtils
 import com.google.api.services.drive.Drive
-import com.google.api.services.drive.DriveScopes
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.MultiFormatWriter
-import com.google.zxing.WriterException
-import com.google.zxing.common.BitMatrix
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import pl.vi.videorecorder.DriveFunctions.generateDriveLink
 import pl.vi.videorecorder.DriveFunctions.getDriveService
 import pl.vi.videorecorder.DriveFunctions.signIn
-import pl.vi.videorecorder.FileFunctions.generateQRCode
-import pl.vi.videorecorder.FileFunctions.getFileName
 import pl.vi.videorecorder.FileFunctions.makeCopy
 import pl.vi.videorecorder.FileFunctions.updateLink
 import pl.vi.videorecorder.UIFunctions.displayVideo
 import pl.vi.videorecorder.UIFunctions.shareVideo
-import pl.vi.videorecorder.UIFunctions.showQRCodeDialog
 import pl.vi.videorecorder.databinding.ActivityMainBinding
 import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.io.IOException
 
 
@@ -87,13 +63,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.shareBtn.setOnClickListener {
-            shareVideo(selectedUri){ intent, title ->
+            shareVideo(selectedUri) { intent, title ->
                 startActivity(Intent.createChooser(intent, title))
             }
         }
 
         binding.uploadToDrive.setOnClickListener {
-            signIn(applicationContext){ intent, requestInt ->
+            signIn(applicationContext) { intent, requestInt ->
                 startActivityForResult(intent, requestInt)
             }
         }
@@ -225,7 +201,11 @@ class MainActivity : AppCompatActivity() {
                                                             withContext(Dispatchers.IO) {
                                                                 delay(5000)
                                                                 if (!file?.id.isNullOrBlank()) {
-                                                                    updateLink(file, context, binding)
+                                                                    updateLink(
+                                                                        file,
+                                                                        context,
+                                                                        binding
+                                                                    )
                                                                     Log.w(
                                                                         "UploadProgress",
                                                                         "id is ${file?.id}"

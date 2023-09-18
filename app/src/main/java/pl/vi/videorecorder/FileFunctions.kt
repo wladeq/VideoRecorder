@@ -87,7 +87,7 @@ object FileFunctions {
                 "UploadProgress",
                 "link - ${link}"
             )
-            UIFunctions.showQRCodeDialog(context, link)
+            UIFunctions.showQRCodeDialog(context, link, binding)
             binding.path.setText(link)
         }
     }

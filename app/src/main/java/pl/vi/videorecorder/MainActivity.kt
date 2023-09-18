@@ -39,7 +39,7 @@ class MainActivity : AppCompatActivity() {
     lateinit var mDrive: Drive
     private var selectedFile: File? = null
     private var selectedUri: Uri? = null
-
+    private var file: com.google.api.services.drive.model.File? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -63,8 +63,16 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.shareBtn.setOnClickListener {
-            shareVideo(selectedUri) { intent, title ->
-                startActivity(Intent.createChooser(intent, title))
+            try {
+                shareVideo(selectedUri) { intent, title ->
+                    startActivity(Intent.createChooser(intent, title))
+                }
+            } catch (ex: Exception) {
+                Toast.makeText(
+                    applicationContext,
+                    "upload video to share",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
 
@@ -72,6 +80,46 @@ class MainActivity : AppCompatActivity() {
             signIn(applicationContext) { intent, requestInt ->
                 startActivityForResult(intent, requestInt)
             }
+        }
+
+        binding.generateQr.setOnClickListener {
+            lifecycleScope.launch {
+                try {
+
+                    updateLink(
+                        file,
+                        applicationContext,
+                        binding
+                    )
+
+                } catch (ex: Exception) {
+                    Toast.makeText(
+                        applicationContext,
+                        "upload video to share",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+
+        binding.shareLink.setOnClickListener {
+            try {
+                val intent = Intent().apply {
+                    action = Intent.ACTION_SEND
+                    putExtra(Intent.EXTRA_TEXT, binding.path.text.toString())
+                    type = "text/plain"
+                }
+
+                val shareIntent = Intent.createChooser(intent, "share video link")
+                startActivity(shareIntent)
+            } catch (ex: Exception) {
+                Toast.makeText(
+                    applicationContext,
+                    "upload video to share",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+
         }
     }
 
@@ -140,7 +188,6 @@ class MainActivity : AppCompatActivity() {
                     gfile.name = "First Video1"
                     val mimetype = "video/mp4"
                     val fileContent = FileContent(mimetype, raunit)
-                    var file: com.google.api.services.drive.model.File? = null
 
                     withContext(Dispatchers.IO) {
                         launch {
@@ -193,11 +240,12 @@ class MainActivity : AppCompatActivity() {
                                                 UploadState.MEDIA_COMPLETE -> {
                                                     lifecycleScope.launch {
                                                         withContext(Dispatchers.Main) {
-                                                            binding.path.setText("Upload complete")
+                                                            binding.path.setText("Upload complete. Generating link...")
                                                             Log.d(
                                                                 "UploadProgress",
                                                                 "Upload completed"
                                                             )
+
                                                             withContext(Dispatchers.IO) {
                                                                 delay(5000)
                                                                 if (!file?.id.isNullOrBlank()) {
@@ -206,11 +254,13 @@ class MainActivity : AppCompatActivity() {
                                                                         context,
                                                                         binding
                                                                     )
+
                                                                     Log.w(
                                                                         "UploadProgress",
                                                                         "id is ${file?.id}"
                                                                     )
                                                                     //fetchWebContentLink(file?.id ?: "")
+
                                                                 } else {
                                                                     Log.w(
                                                                         "UploadProgress",

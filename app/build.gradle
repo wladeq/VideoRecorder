@@ -1,3 +1,11 @@
+//email : gdykoplas@gmail.com
+//pass: g(cF9JL7PT(H^LAx
+//
+//google api:
+//786812353148-h380e2s4j6p5u8ihrlbvanjro319oo3s.apps.googleusercontent.com
+//
+//pass do klucza prywatnego appku
+//videorecorder
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
